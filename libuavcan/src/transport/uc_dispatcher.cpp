@@ -287,11 +287,6 @@ int Dispatcher::spinOnce()
 int Dispatcher::send(const Frame& frame, MonotonicTime tx_deadline, MonotonicTime blocking_deadline,
                      CanTxQueue::Qos qos, CanIOFlags flags, uint8_t iface_mask)
 {
-    if (frame.getSrcNodeID() != getNodeID())
-    {
-        UAVCAN_ASSERT(0);
-        return -ErrLogic;
-    }
 
     CanFrame can_frame;
     if (!frame.compile(can_frame))

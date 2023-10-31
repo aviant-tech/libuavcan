@@ -108,6 +108,22 @@ public:
      */
     int send(const uint8_t* payload, unsigned payload_len, MonotonicTime tx_deadline,
              MonotonicTime blocking_deadline, TransferType transfer_type, NodeID dst_node_id) const;
+
+    /**
+     * Send with explicit Transfer ID and specified source ID and interface mask
+     *
+     * This is useful for forwarding messages between two different CAN interfaces
+    */
+    int send(const uint8_t* payload, unsigned payload_len, MonotonicTime tx_deadline,
+            MonotonicTime blocking_deadline, TransferType transfer_type, NodeID src_node_id, NodeID dst_node_id, uint8_t iface_mask, TransferID tid) const;
+
+    /**
+     * Send with automatic Transfer ID and specified source ID and interface mask
+     *
+     * This is useful for forwarding messages between two different CAN interfaces
+    */
+    int send(const uint8_t* payload, unsigned payload_len, MonotonicTime tx_deadline,
+                         MonotonicTime blocking_deadline, TransferType transfer_type, NodeID src_node_id, NodeID dst_node_id, uint8_t iface_mask) const;
 };
 
 }
