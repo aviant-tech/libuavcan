@@ -48,6 +48,10 @@ protected:
     int genericPublish(const StaticTransferBufferImpl& buffer, TransferType transfer_type,
                        NodeID dst_node_id, TransferID* tid, MonotonicTime blocking_deadline);
 
+    int genericPublish(const StaticTransferBufferImpl& buffer, TransferType transfer_type,
+                       NodeID src_node_id, NodeID dst_node_id, uint8_t iface_mask, TransferID* tid,
+                       MonotonicTime blocking_deadline);
+
     TransferSender& getTransferSender() { return sender_; }
     const TransferSender& getTransferSender() const { return sender_; }
 
@@ -106,6 +110,9 @@ class UAVCAN_EXPORT GenericPublisher : public GenericPublisherBase
     int genericPublish(const DataStruct& message, TransferType transfer_type, NodeID dst_node_id,
                        TransferID* tid, MonotonicTime blocking_deadline);
 
+    int genericPublish(const DataStruct& message, TransferType transfer_type, NodeID src_node_id, NodeID dst_node_id,
+                       uint8_t iface_mask, TransferID* tid, MonotonicTime blocking_deadline);
+
 public:
     /**
      * @param max_transfer_interval     Maximum expected time interval between subsequent publications. Leave default.
@@ -145,6 +152,12 @@ public:
                 MonotonicTime blocking_deadline = MonotonicTime())
     {
         return genericPublish(message, transfer_type, dst_node_id, &tid, blocking_deadline);
+    }
+
+    int publish(const DataStruct& message, TransferType transfer_type, NodeID src_node_id, NodeID dst_node_id,
+                uint8_t iface_mask, MonotonicTime blocking_deadline = MonotonicTime())
+    {
+        return genericPublish(message, transfer_type, src_node_id, dst_node_id, iface_mask, UAVCAN_NULLPTR, blocking_deadline);
     }
 };
 
@@ -194,6 +207,28 @@ int GenericPublisher<DataSpec, DataStruct>::genericPublish(const DataStruct& mes
     }
 
     return GenericPublisherBase::genericPublish(buffer, transfer_type, dst_node_id, tid, blocking_deadline);
+}
+
+template <typename DataSpec, typename DataStruct>
+int GenericPublisher<DataSpec, DataStruct>::genericPublish(const DataStruct& message, TransferType transfer_type,
+                                                           NodeID src_node_id, NodeID dst_node_id, uint8_t iface_mask,
+                                                           TransferID* tid, MonotonicTime blocking_deadline)
+{
+    const int res = checkInit();
+    if (res < 0)
+    {
+        return res;
+    }
+
+    Buffer buffer;
+
+    const int encode_res = doEncode(message, buffer);
+    if (encode_res < 0)
+    {
+        return encode_res;
+    }
+
+    return GenericPublisherBase::genericPublish(buffer, transfer_type, src_node_id, dst_node_id, iface_mask, tid, blocking_deadline);
 }
 
 }

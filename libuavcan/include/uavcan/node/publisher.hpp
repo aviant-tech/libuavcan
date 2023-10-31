@@ -55,6 +55,14 @@ public:
     }
 
     /**
+     * Broadcast the message with a specified src_node_id and interface mask
+     * Returns negative error code.
+    */
+    int broadcast(uint8_t iface_mask, NodeID src_node_id, const DataType& message){
+        return BaseType::publish(message, TransferTypeMessageBroadcast, src_node_id, NodeID::Broadcast, iface_mask);
+    }
+
+    /**
      * Warning: You probably don't want to use this method; it's for advanced use cases like
      * e.g. network time synchronization. Use the overloaded method with fewer arguments instead.
      * This overload allows to explicitly specify Transfer ID.

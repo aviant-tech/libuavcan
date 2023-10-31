@@ -28,7 +28,50 @@ int TransferSender::send(const uint8_t* payload, unsigned payload_len, Monotonic
                          MonotonicTime blocking_deadline, TransferType transfer_type, NodeID dst_node_id,
                          TransferID tid) const
 {
-    Frame frame(data_type_id_, transfer_type, dispatcher_.getNodeID(), dst_node_id, tid);
+    return send(payload, payload_len, tx_deadline, blocking_deadline, transfer_type, dispatcher_.getNodeID(),
+                dst_node_id, 0xff, tid);
+}
+
+int TransferSender::send(const uint8_t* payload, unsigned payload_len, MonotonicTime tx_deadline,
+                         MonotonicTime blocking_deadline, TransferType transfer_type, NodeID dst_node_id) const
+{
+    return send(payload, payload_len, tx_deadline, blocking_deadline, transfer_type,
+                dispatcher_.getNodeID(), dst_node_id, 0xff);
+}
+
+int TransferSender::send(const uint8_t* payload, unsigned payload_len, MonotonicTime tx_deadline,
+                         MonotonicTime blocking_deadline, TransferType transfer_type, NodeID src_node_id,
+                         NodeID dst_node_id, uint8_t iface_mask) const
+{
+    /*
+     * TODO: TID is not needed for anonymous transfers, this part of the code can be skipped?
+     */
+    const OutgoingTransferRegistryKey otr_key(data_type_id_, transfer_type, dst_node_id);
+
+    UAVCAN_ASSERT(!tx_deadline.isZero());
+    const MonotonicTime otr_deadline = tx_deadline + max(max_transfer_interval_ * 2,
+                                                         OutgoingTransferRegistry::MinEntryLifetime);
+
+    TransferID* const tid = dispatcher_.getOutgoingTransferRegistry().accessOrCreate(otr_key, otr_deadline);
+    if (tid == UAVCAN_NULLPTR)
+    {
+        UAVCAN_TRACE("TransferSender", "OTR access failure, dtid=%d tt=%i",
+                     int(data_type_id_.get()), int(transfer_type));
+        return -ErrMemory;
+    }
+
+    const TransferID this_tid = tid->get();
+    tid->increment();
+
+    return send(payload, payload_len, tx_deadline, blocking_deadline, transfer_type,
+                src_node_id, dst_node_id, iface_mask, this_tid);
+}
+
+int TransferSender::send(const uint8_t* payload, unsigned payload_len, MonotonicTime tx_deadline,
+            MonotonicTime blocking_deadline, TransferType transfer_type, NodeID src_node_id, NodeID dst_node_id,
+            uint8_t iface_mask, TransferID tid) const
+{
+    Frame frame(data_type_id_, transfer_type, src_node_id, dst_node_id, tid);
 
     frame.setPriority(priority_);
     frame.setStartOfTransfer(true);
@@ -71,7 +114,7 @@ int TransferSender::send(const uint8_t* payload, unsigned payload_len, Monotonic
 
         const CanIOFlags flags = frame.getSrcNodeID().isUnicast() ? flags_ : (flags_ | CanIOFlagAbortOnError);
 
-        return dispatcher_.send(frame, tx_deadline, blocking_deadline, qos_, flags, iface_mask_);
+        return dispatcher_.send(frame, tx_deadline, blocking_deadline, qos_, flags, iface_mask_ & iface_mask);
     }
     else                                                   // Multi Frame Transfer
     {
@@ -105,7 +148,7 @@ int TransferSender::send(const uint8_t* payload, unsigned payload_len, Monotonic
 
         while (true)
         {
-            const int send_res = dispatcher_.send(frame, tx_deadline, blocking_deadline, qos_, flags_, iface_mask_);
+            const int send_res = dispatcher_.send(frame, tx_deadline, blocking_deadline, qos_, flags_, iface_mask_ & iface_mask);
             if (send_res < 0)
             {
                 registerError();
@@ -141,33 +184,6 @@ int TransferSender::send(const uint8_t* payload, unsigned payload_len, Monotonic
 
     UAVCAN_ASSERT(0);
     return -ErrLogic; // Return path analysis is apparently broken. There should be no warning, this 'return' is unreachable.
-}
-
-int TransferSender::send(const uint8_t* payload, unsigned payload_len, MonotonicTime tx_deadline,
-                         MonotonicTime blocking_deadline, TransferType transfer_type, NodeID dst_node_id) const
-{
-    /*
-     * TODO: TID is not needed for anonymous transfers, this part of the code can be skipped?
-     */
-    const OutgoingTransferRegistryKey otr_key(data_type_id_, transfer_type, dst_node_id);
-
-    UAVCAN_ASSERT(!tx_deadline.isZero());
-    const MonotonicTime otr_deadline = tx_deadline + max(max_transfer_interval_ * 2,
-                                                         OutgoingTransferRegistry::MinEntryLifetime);
-
-    TransferID* const tid = dispatcher_.getOutgoingTransferRegistry().accessOrCreate(otr_key, otr_deadline);
-    if (tid == UAVCAN_NULLPTR)
-    {
-        UAVCAN_TRACE("TransferSender", "OTR access failure, dtid=%d tt=%i",
-                     int(data_type_id_.get()), int(transfer_type));
-        return -ErrMemory;
-    }
-
-    const TransferID this_tid = tid->get();
-    tid->increment();
-
-    return send(payload, payload_len, tx_deadline, blocking_deadline, transfer_type,
-                dst_node_id, this_tid);
 }
 
 }
